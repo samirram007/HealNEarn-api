@@ -1,0 +1,91 @@
+{
+	"private": true,
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build"
+	},
+	"devDependencies": {
+		"axios": "^1.1.2",
+		"laravel-vite-plugin": "^0.7.2",
+		"vite": "^4.0.0"
+	},
+	"Transform": "AWS::Serverless-2016-10-31",
+	"Resources": {
+		"Signup": {
+			"Type": "AWS::Serverless::Api",
+			"Properties": {
+				"Name": {
+					"Fn::Sub": [
+						"${ResourceName} From Stack ${AWS::StackName}",
+						{
+							"ResourceName": "Signup"
+						}
+					]
+				},
+				"StageName": "Prod",
+				"DefinitionBody": {
+					"openapi": "3.0",
+					"info": {},
+					"paths": {
+						"/api/signup": {
+							"post": {
+								"responses": {}
+							}
+						}
+					}
+				},
+				"EndpointConfiguration": "REGIONAL",
+				"TracingEnabled": true,
+				"Cors": {
+					"MaxAge": 5
+				}
+			}
+		},
+		"Login": {
+			"Type": "AWS::Serverless::Api",
+			"Properties": {
+				"Name": {
+					"Fn::Sub": [
+						"${ResourceName} From Stack ${AWS::StackName}",
+						{
+							"ResourceName": "Login"
+						}
+					]
+				},
+				"StageName": "Prod",
+				"DefinitionBody": {
+					"openapi": "3.0",
+					"info": {},
+					"paths": {
+						"/api/login": {
+							"post": {
+								"responses": {}
+							}
+						}
+					}
+				},
+				"EndpointConfiguration": "REGIONAL",
+				"TracingEnabled": true,
+				"Cors": {
+					"MaxAge": 5
+				}
+			}
+		}
+	},
+	"Metadata": {
+		"AWS::Composer::Groups": {
+			"Group": {
+				"Label": "Auth",
+				"Members": [
+					"Login"
+				]
+			},
+			"Group2": {
+				"Label": "Auth",
+				"Members": [
+					"Signup"
+				]
+			}
+		}
+	}
+}
