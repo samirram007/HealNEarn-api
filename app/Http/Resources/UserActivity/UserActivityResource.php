@@ -35,6 +35,7 @@ class UserActivityResource extends SuccessResource
             'selfBalance'=>$this->self_balance,
             'teamBalance'=>$this->team_balance,
             'totalBalance'=>$this->total_balance,
+            'capValue'=>$this->cap_value,
             'lastPaymentDate'=>$this->last_payment_date,
             'user' => new UserResource($this->whenLoaded('user')),
 

@@ -31,6 +31,7 @@ return new class extends Migration
             $table->integer('self_balance')->default(0);
             $table->integer('team_balance')->default(0);
             $table->integer('total_balance')->default(0);
+            $table->integer('cap_value')->default(0);
             $table->date('last_payment_date')->default(now());
             $table->timestamps();
         });

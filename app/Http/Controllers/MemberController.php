@@ -69,4 +69,22 @@ class MemberController extends Controller
 
         return $response;
     }
+    public function member_children($id)
+    {
+        $response = $this->memberService->getMemberChildren($id);
+
+        return $response;
+    }
+    public function member_earning($id)
+    {
+        $response = $this->memberService->getMemberEarning($id);
+
+        return $response;
+    }
+    public function member_payment($id)
+    {
+        $response = $this->memberService->getMemberPayment($id);
+
+        return $response;
+    }
 }

@@ -19,7 +19,7 @@ class ProductService implements IProductService
         return ProductCollection::make(Product::all());
     }
 
-    public function getById(int $id)
+    public function getById( $id)
     {
 
         // $response=Product::find($id);
@@ -53,7 +53,7 @@ class ProductService implements IProductService
         return ProductResource::make($response);
     }
 
-    public function update(UpdateProductRequest $request, int $id)
+    public function update(UpdateProductRequest $request,  $id)
     {
         $response = Product::find($id)->update($request->validated());
 
@@ -61,7 +61,7 @@ class ProductService implements IProductService
 
     }
 
-    public function delete(int $id)
+    public function delete( $id)
     {
 
         Product::find($id)->delete();

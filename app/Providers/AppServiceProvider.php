@@ -11,8 +11,10 @@ use App\Services\impl\DocumentService;
 use App\Services\impl\ManagerService;
 use App\Services\impl\MemberService;
 use App\Services\impl\ProductService;
+use App\Services\impl\SaleService;
 use App\Services\impl\UserService;
 use App\Services\IProductService;
+use App\Services\ISaleService;
 use App\Services\IUserService;
 use Illuminate\Support\ServiceProvider;
 
@@ -29,6 +31,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(IProductService::class, ProductService::class);
         $this->app->bind(IMemberService::class, MemberService::class);
         $this->app->bind(IManagerService::class, ManagerService::class);
+        $this->app->bind(ISaleService::class, SaleService::class);
     }
 
     /**

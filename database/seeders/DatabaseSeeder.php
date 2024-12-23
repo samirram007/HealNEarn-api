@@ -48,6 +48,7 @@ class DatabaseSeeder extends Seeder
             'id' => 1,
             'name' => 'Foot Patch',
             'price' => 300,
+            'description'=>'Foot Patch'
 
         ]);
         for ($i = 0; $i < 2; $i++) {
@@ -63,20 +64,20 @@ class DatabaseSeeder extends Seeder
                 'password' => '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password
                 'remember_token' => Str::random(10),
             ]);
-            for ($j = 0; $j < 3; $j++) {
-                \App\Models\User::create([
-                    'name' => 'MEMBER '.$i.$j,
-                    'parent_id' => $user->id,
-                    'manager_id' => $user->id,
-                    'status' => UserStatusEnum::INACTIVE,
-                    'user_type' => UserTypeEnum::MEMBER,
-                    'email' => 'member'.$i.$j.'@admin.com',
-                    'email_verified_at' => now(),
-                    'contact_no' => str_pad($user->id.str_repeat((string) $i.$j, 4), 10, '0', STR_PAD_RIGHT),
-                    'password' => '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password
-                    'remember_token' => Str::random(10),
-                ]);
-            }
+            // for ($j = 0; $j < 3; $j++) {
+            //     \App\Models\User::create([
+            //         'name' => 'MEMBER '.$i.$j,
+            //         'parent_id' => $user->id,
+            //         'manager_id' => $user->id,
+            //         'status' => UserStatusEnum::INACTIVE,
+            //         'user_type' => UserTypeEnum::MEMBER,
+            //         'email' => 'member'.$i.$j.'@admin.com',
+            //         'email_verified_at' => now(),
+            //         'contact_no' => str_pad($user->id.str_repeat((string) $i.$j, 4), 10, '0', STR_PAD_RIGHT),
+            //         'password' => '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password
+            //         'remember_token' => Str::random(10),
+            //     ]);
+            // }
         }
 
     }

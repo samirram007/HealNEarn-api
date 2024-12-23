@@ -28,6 +28,7 @@ class UserActivity extends Model
         'team_balance',
         'total_balance',
         'last_payment_date',
+        'cap_value'
     ];
 
     public function user(){

@@ -8,9 +8,12 @@ use App\Http\Requests\Member\StoreMemberRequest;
 use App\Http\Requests\Member\UpdateMemberRequest;
 use App\Http\Resources\Member\MemberCollection;
 use App\Http\Resources\Member\MemberResource;
+use App\Models\Sale;
 use App\Models\User as Member;
+use App\Models\UserActivity;
 use App\Services\IMemberService;
 use Exception;
+use Illuminate\Support\Facades\DB;
 
 class MemberService implements IMemberService
 {
@@ -22,8 +25,9 @@ class MemberService implements IMemberService
 
             'parent',
             'manager',
-             'user_activity',
-               ];
+            'user_activity',
+            'sales.product',
+        ];
     }
 
     public function getAll()
@@ -48,7 +52,7 @@ class MemberService implements IMemberService
                 'message' => 'No records found.',
             ], 404); // Return 404 status code
         }
-// dd($members->toArray());
+        // dd($members->toArray());
         return MemberCollection::make($members);
 
     }
@@ -76,7 +80,7 @@ class MemberService implements IMemberService
 
             return response()->json([
                 'status' => false,
-                'message' => 'Record not found.' ,
+                'message' => 'Record not found.',
                 'code' => 404,
             ], 404);
         }
@@ -105,13 +109,104 @@ class MemberService implements IMemberService
             ], 404);
         }
     }
+    public function getMemberChildren($id)
+    {
+
+        try {
+            $response = Member::with('descendants', 'user_activity')->findOrFail($id);
+
+            return MemberResource::make($response);
+        } catch (Exception $e) {
+            // Handle the case where the model is not found
+            // throw new ExceptionsModelNotFoundException($e);
+            // return new ExceptionsModelNotFoundException($e);
+            //dd($e);
+            return response()->json([
+                'status' => false,
+                'message' => 'Record not found.',
+                'code' => 404,
+            ], 404);
+        }
+    }
+    public function getMemberEarning($id)
+    {
+        try {
+            $response = Member::with('user_activity')->findOrFail($id);
+
+            return MemberResource::make($response);
+        } catch (Exception $e) {
+            // Handle the case where the model is not found
+            // throw new ExceptionsModelNotFoundException($e);
+            // return new ExceptionsModelNotFoundException($e);
+            //dd($e);
+            return response()->json([
+                'status' => false,
+                'message' => 'Record not found.',
+                'code' => 404,
+            ], 404);
+        }
+    }
+    public function getMemberPayment($id)
+    {
+        try {
+            $response = Member::with('payments', 'user_activity')->findOrFail($id);
+
+            return MemberResource::make($response);
+        } catch (Exception $e) {
+            // Handle the case where the model is not found
+            // throw new ExceptionsModelNotFoundException($e);
+            // return new ExceptionsModelNotFoundException($e);
+            //dd($e);
+            return response()->json([
+                'status' => false,
+                'message' => 'Record not found.',
+                'code' => 404,
+            ], 404);
+        }
+    }
 
     public function store(StoreMemberRequest $request)
     {
-        //dd($request->validated());
-        $response = Member::create($request->validated());
+        DB::beginTransaction();
 
-        return MemberResource::make($response);
+        try {
+        // Extract validated data
+        $validatedData = $request->validated();
+
+        // Extract sale data
+        $saleData = $validatedData['sale'] ?? null;
+
+        // Remove sale from member data to create the user
+        unset($validatedData['sale']);
+
+        // Create the member
+        $member = Member::create($validatedData);
+
+        // If sale data exists, associate it with the created member
+        if ($saleData) {
+            $saleData['user_id'] = $member->id; // Add user_id to sale
+            $sale = Sale::create($saleData); // Assuming you have a `Sale` model
+        }
+        $userActivityExists = UserActivity::where('user_id', $member->id)->exists();
+
+        if (!$userActivityExists) {
+            $userActivity = new UserActivity();
+            $userActivity->user_id = $member->id;
+            $userActivity->save();
+        }
+        DB::commit();
+        return MemberResource::make($member);
+    } catch (Exception $e) {
+        // If an error occurs, roll back the transaction
+        DB::rollBack();
+
+        // Return an error response
+        return response()->json([
+            'status' => false,
+            'message' => 'Something went wrong. Please try again.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
     }
 
     public function update(UpdateMemberRequest $request, $id)

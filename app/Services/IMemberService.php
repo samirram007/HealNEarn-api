@@ -10,6 +10,9 @@ interface IMemberService
     public function getAll();
 
     public function getById($id);
+    public function getMemberChildren($id);
+    public function getMemberEarning($id);
+    public function getMemberPayment($id);
 
     public function getByUsername($username);
 

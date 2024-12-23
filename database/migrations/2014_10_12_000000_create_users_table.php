@@ -20,10 +20,11 @@ return new class extends Migration
             $table->enum('status', array_keys(UserStatusEnum::labels()))->default(UserStatusEnum::INACTIVE);
 
             $table->unsignedBigInteger('manager_id')->nullable();
-            $table->unsignedBigInteger('product_id')->nullable();
-            $table->datetime('purchase_date')->nullable();
-            $table->integer('product_amount')->nullable();
-            $table->string('product_no')->nullable();
+            $table->datetime('activation_date')->nullable();
+            // $table->datetime('purchase_date')->nullable();
+            // $table->unsignedBigInteger('product_id')->nullable();
+            // $table->integer('product_amount')->nullable();
+            // $table->string('product_no')->nullable();
             $table->string('name');
             $table->string('username')->unique();
             $table->enum('user_type', array_keys(UserTypeEnum::labels()))->default(UserTypeEnum::MANAGER);

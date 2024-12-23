@@ -5,7 +5,11 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ManagerController;
 use App\Http\Controllers\MemberController;
+use App\Http\Controllers\MemberEarningController;
+use App\Http\Controllers\MemberPaymentController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\SaleController;
 use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -47,7 +51,17 @@ Route::group(['middleware' => 'auth:api'], function () {
     Route::get('auth/profile', [AuthController::class, 'profile']);
     Route::apiResource('addresses', AddressController::class);
     Route::apiResource('members', MemberController::class);
+
+    Route::get('member_children/{id}', [MemberController::class,'member_children']);
+
+    Route::get('member_earning/{id}', [MemberController::class, 'member_earning']);
+
+    Route::get('member_payment/{id}', [MemberController::class,'member_payment']);
+    Route::post('member_payments', [MemberPaymentController::class,'store']);
+
     Route::apiResource('managers', ManagerController::class);
+    Route::apiResource('sales', SaleController::class);
     Route::apiResource('documents', DocumentController::class);
     Route::apiResource('products', ProductController::class);
+    Route::apiResource('payments', PaymentController::class);
 });

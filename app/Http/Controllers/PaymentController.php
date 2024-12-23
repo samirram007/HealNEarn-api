@@ -2,14 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Payment\StorePaymentRequest;
 use App\Models\Payment;
+use App\Services\IPaymentService;
 use Illuminate\Http\Request;
 
 class PaymentController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    protected $productService;
+
+    public function __construct(IPaymentService $productService)
+    {
+        $this->productService = $productService;
+    }
     public function index()
     {
         //
@@ -18,9 +23,10 @@ class PaymentController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StorePaymentRequest $request)
     {
-        //
+        $response=$this->productService->store($request);
+        return $response;
     }
 
     /**

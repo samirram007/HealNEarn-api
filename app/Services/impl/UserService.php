@@ -2,6 +2,7 @@
 
 namespace App\Services\impl;
 
+use App\Enums\UserStatusEnum;
 use App\Enums\UserTypeEnum;
 use App\Exceptions\ModelNotFoundException as ExceptionsModelNotFoundException;
 use App\Http\Requests\User\PasswordChangeRequest;
@@ -14,6 +15,7 @@ use App\Http\Resources\User\UserCollection;
 use App\Http\Resources\User\UserResource;
 use App\Models\JoiningBenefit;
 use App\Models\PoolIncome;
+use App\Models\Sale;
 use App\Models\User;
 use App\Models\UserActivity;
 use App\Services\IUserService;
@@ -127,6 +129,9 @@ class UserService implements IUserService
     {
         // UserActivity::truncate();
         // JoiningBenefit::truncate();
+
+        // call for testing only
+        $this->poolIncome();
         DB::beginTransaction();
 
         try {
@@ -139,41 +144,70 @@ class UserService implements IUserService
                     'message' => 'User not found',
                 ], 404);
             }
+            if ($user->status !== 'active') {
+                // Update user status and other fields
+                $user->status = $data['status'];
+                // $user->product_id = $data['product_id'] ?? 1;
 
-            // Update user status and other fields
-            $user->status = $data['status'];
-            $user->product_id = $data['product_id'] ?? 1;
+                // Handle purchase date
 
-            // Handle purchase date
-            $purchaseDate = isset($data['purchase_date'])
-                ? Carbon::parse($data['purchase_date']) // Convert timestamp
-                : now();
+                $activationDate = isset($data['activation_date'])
+                    ? Carbon::parse($data['activation_date']) // Convert timestamp
+                    : now();
 
-            $user->purchase_date = $purchaseDate->toDateTimeString();
-            $user->product_no = $data['product_no'];
-            $user->product_amount = $data['product_amount'] ?? 300;
+                $user->activation_date = $activationDate->toDateTimeString();
+                $user->update();
+            }
 
+            if ($user->status === UserStatusEnum::ACTIVE) {
+                // dd($user->status);
+                $firstSale = Sale::where('user_id', $user->id)
+                    ->where('is_confirm', false)
+                    ->first();
+                    if ($firstSale) {
+                        $firstSale->confirmation_date = $activationDate->toDateTimeString();
+                        $firstSale->confirmed_by_id = auth()->user()->id;
+                        $firstSale->is_confirm = true;
+                        $firstSale->update();
+
+
+                    }
+                   // dd($firstSale);
+
+            }
             // Save the changes
-            $user->update();
+            $userActivityExists = UserActivity::where('user_id', $user->id)->exists();
+
+            $totalSale = Sale::where('user_id', $user->id)->where('is_confirm', true)->sum('amount');
+            if (!$userActivityExists) {
+                $userActivity = new UserActivity();
+                $userActivity->user_id = $user->id;
+                $userActivity->cap_value = $totalSale ?: 0;
+                $userActivity->save();
+            } else {
+                $userActivity = UserActivity::where('user_id', $user->id)->first();
+                $userActivity->cap_value = $totalSale ?: 0;
+                $userActivity->save();
+            }
 
             //Distribute Commission To Parent upto 7 step
 
             // Commit the transaction
             DB::commit();
-            // dd($user);
-            $existInDistribution = JoiningBenefit::where('user_id', $user->id)->first();
-            if (!$existInDistribution) {
-                dd('');
-            }
-            $this->distributeJoiningCommission($user);
+            //dd($user->sales->first());
+            // $existInDistribution = JoiningBenefit::where('user_id', $user->id)->first();
+            // if (!$existInDistribution) {
+            //     dd('');
+            // }
+            $this->distributeJoiningBenefit($user);
             $this->poolIncome();
-            return response()->json(['data' => $this->selectedParentList]);
+            // return response()->json(['data' => $this->selectedParentList]);
             // Return response with the updated user data
-            // return response()->json([
-            //     'status' => true,
-            //     'message' => 'Status changed successfully',
-            //     'data' => new UserResource($user),
-            // ]);
+            return response()->json([
+                'status' => true,
+                'message' => 'Status changed successfully',
+                'data' => new UserResource($user),
+            ]);
         } catch (Exception $e) {
             // If an error occurs, roll back the transaction
             DB::rollBack();
@@ -187,7 +221,7 @@ class UserService implements IUserService
         }
     }
 
-    private function distributeJoiningCommission(User $user)
+    private function distributeJoiningBenefit(User $user)
     {
         $commissionRates = [
             1 => 30, // Level 1
@@ -198,72 +232,74 @@ class UserService implements IUserService
             6 => 5,  // Level 6
             7 => 5,  // Level 7
         ];
+        $sales = Sale::where('user_id', $user->id)
+            ->where('is_confirm', true)
+            ->whereNotIn('id', function ($query) {
+                $query->select('sale_id') // Assuming the column that connects JoiningBenefit with Sale is `sale_id`
+                    ->from('joining_benefits');
+            })
+            ->get();
+       // dd($sales);
+        foreach ($sales as $key => $sale) {
+            //$amount = $sale->amount;
+            $currentParent = $user->parent; // Start with the immediate parent
+            $level = 1;
+            $teamEarning = 0;
+            while ($currentParent) {
+               // dump($currentParent->id);
+                // Calculate commission
+                $commission = 0; // Assuming `joining_amount` is on the user model
+                //dump($currentParent->user_type);
+                if (in_array($currentParent->user_type, [UserTypeEnum::ADMIN])) {
+                    $commission = 0;
+                } elseif (in_array($currentParent->user_type, [UserTypeEnum::MANAGER])) {
+                    $commission = 30;
+                    JoiningBenefit::create([
+                        'user_id' => $user->id, // ID of the user whose commission is being distributed
+                        'sale_id' => $sale->id,
+                        'parent_id' => $currentParent->id, // Parent receiving the commission
+                        'level' => $level,           // Level of hierarchy
+                        'amount' => $sale->amount, // Original amount
+                        'commission' => $sale->quantity * $commission, // Calculated commission
+                    ]);
+                } elseif (in_array($currentParent->user_type, [UserTypeEnum::MEMBER])) {
+                    if ($level <= count($commissionRates)) {
+                        $commission = $commissionRates[$level];
+                        //this will store all parent temporarily
 
-        $currentParent = $user->parent; // Start with the immediate parent
-        $level = 1;
-        $teamEarning = 0;
-        while ($currentParent) {
-            // Calculate commission
-            $commission = 0; // Assuming `joining_amount` is on the user model
-            //dump($currentParent->user_type);
-            if (in_array($currentParent->user_type, [UserTypeEnum::ADMIN])) {
-                $commission = 0;
-            } elseif (in_array($currentParent->user_type, [UserTypeEnum::MANAGER])) {
-                $commission = 30;
-                JoiningBenefit::create([
-                    'user_id' => $user->id,       // ID of the user whose commission is being distributed
-                    'parent_id' => $currentParent->id, // Parent receiving the commission
-                    'level' => $level,           // Level of hierarchy
-                    'amount' => $user->product_amount, // Original amount
-                    'commission' => $commission, // Calculated commission
-                ]);
-            } elseif (in_array($currentParent->user_type, [UserTypeEnum::MEMBER])) {
-                if ($level <= count($commissionRates)) {
-                    $commission = $commissionRates[$level];
-                    //this will store all parent temporarily
-
-                    // Store the commission in the JoiningBenefit table
-                    // JoiningBenefit::create([
-                    //     'user_id' => $user->id,       // ID of the user whose commission is being distributed
-                    //     'parent_id' => $currentParent->id, // Parent receiving the commission
-                    //     'level' => $level,           // Level of hierarchy
-                    //     'amount' => $user->product_amount, // Original amount
-                    //     'commission' => $commission, // Calculated commission
-                    // ]);
+                        // Store the commission in the JoiningBenefit table
+                        JoiningBenefit::create([
+                            'user_id' => $user->id,       // ID of the user whose commission is being distributed
+                            'sale_id' => $sale->id,
+                            'parent_id' => $currentParent->id, // Parent receiving the commission
+                            'level' => $level,           // Level of hierarchy
+                            'amount' => $sale->amount, // Original amount
+                            'commission' => $sale->quantity * $commission, // Calculated commission
+                        ]);
+                    }
+                } else {
+                    $commission = 0;
                 }
-            } else {
-                $commission = 0;
-            }
 
-            $userActivity = $currentParent->user_activity;
-            if (!$userActivity) {
-                $userActivity = new UserActivity();
-                $userActivity->user_id = $currentParent->id;
-                if ($level == 1) {
-                    $userActivity->immediate_count = 1;
-                    $userActivity->immediate_business = $user->product_amount;
-                }
-                $userActivity->team_count = 1;
-                $userActivity->team_business = $user->product_amount;
-                $userActivity->total_count = 1;
-                $userActivity->total_business = $user->product_amount;
-                $userActivity->joining_benefit = $commission;
-                $userActivity->self_earning = $commission;
-                $userActivity->team_earning = $teamEarning;
-                $userActivity->total_earning = ($teamEarning + $commission);
-                $userActivity->self_balance = $commission;
-                $userActivity->team_balance = $teamEarning;
-                $userActivity->total_balance = ($teamEarning + $commission);
-            } else {
-                $userActivity->user_id = $currentParent->id;
+                // dd($currentParent->user_activity);
+                 if(!$currentParent->user_activity){
+                    $userActivity = UserActivity::create(["user_id"=>$currentParent->id]);
+                 }
+                 else{
+
+                     $userActivity = $currentParent->user_activity;
+                 }
+                // dump($userActivity );
+                 $userActivity->user_id = $currentParent->id;
+
                 if ($level == 1) {
                     $userActivity->immediate_count += 1;
-                    $userActivity->immediate_business += $user->product_amount;
+                    $userActivity->immediate_business += $sale->amount;
                 }
                 $userActivity->team_count += 1;
-                $userActivity->team_business += $user->product_amount;
+                $userActivity->team_business += $sale->amount;
                 $userActivity->total_count += 1;
-                $userActivity->total_business += $user->product_amount;
+                $userActivity->total_business += $sale->amount;
                 $userActivity->joining_benefit += $commission;
                 $userActivity->self_earning += $commission;
                 $userActivity->team_earning += $teamEarning;
@@ -271,21 +307,22 @@ class UserService implements IUserService
                 $userActivity->self_balance += $commission;
                 $userActivity->team_balance += $teamEarning;
                 $userActivity->total_balance += ($teamEarning + $commission);
-            }
-            $userActivity->last_payment_date = now()->toDateTimeString();
-            //  $userActivity->save();
+                $userActivity->last_payment_date = now()->toDateTimeString();
+                $userActivity->update();
 
-            //
-            $teamEarning += $commission;
-            // $this->selectedParentList[] = ["id" => $currentParent->id];
-            if (!in_array($currentParent->user_type, [UserTypeEnum::ADMIN, UserTypeEnum::MANAGER])) {
-                //$this->selectedParentList[] = ["id" => $currentParent->id];
-                $this->addParent($currentParent);
+                //
+                $teamEarning += $commission;
+                // $this->selectedParentList[] = ["id" => $currentParent->id];
+                if (!in_array($currentParent->user_type, [UserTypeEnum::ADMIN, UserTypeEnum::MANAGER])) {
+                    //$this->selectedParentList[] = ["id" => $currentParent->id];
+                    $this->addParent($currentParent);
+                }
+                // Move to the next parent
+                $currentParent = $currentParent->parent;
+                $level++;
             }
-            // Move to the next parent
-            $currentParent = $currentParent->parent;
-            $level++;
         }
+
         // dd( $this->selectedParentList);
 
     }
@@ -301,19 +338,26 @@ class UserService implements IUserService
             7 => ["level" => 7, "min" => 2187, "income" => 2500],
         ];
         // Get the list of selected parent IDs
-        $userIds = $this->getSelectedParentList();
-        // dd($userIds);
+        // $parentList = $this->getSelectedParentList();
 
-        foreach ($userIds as $user) {
+        // call for testing only
+        $parentList = User::where('user_type',UserTypeEnum::MEMBER)->get();
+
+        // dd($userIds);
+        $teamIncome = 0;
+        foreach ($parentList as $key=>$user) {
             $userId = $user['id'];
             $level = 1;
+
+            $currentIncome = 0;
             $currentPoolIncomeRates = [];
             // Fetch active child counts grouped by level for the user
             $userActiveChildCount = JoiningBenefit::where('parent_id', '=', $userId)
                 ->selectRaw('level, COUNT(*) as count')
+                // ->groupBy('user_id')
                 ->groupBy('level')
                 ->pluck('count', 'level');
-            //dd($userActiveChildCount);
+            dd($userActiveChildCount);
 
             // Check each level against pool income criteria
             foreach ($poolIncomeRates as $rate) {
@@ -326,7 +370,7 @@ class UserService implements IUserService
                     // Save the pool income in the database
                     $poolIncome = PoolIncome::where('user_id', $userId)->where('level', $level)->first();
                     if (!$poolIncome) {
-
+                        $currentIncome += $rate['income'];
                         PoolIncome::create([
                             'user_id' => $userId,
                             'level' => $rate['level'],
@@ -341,10 +385,19 @@ class UserService implements IUserService
 
             // Optionally, log or process the user's total pool income
             // e.g., update user's total income, etc.
-            $totalIncome = array_sum(array_column($currentPoolIncomeRates, 'income'));
+            $currentIncome = array_sum(array_column($currentPoolIncomeRates, 'income'));
+            // $totalIncome = array_sum(array_column($currentPoolIncomeRates, 'income'));
             $userActivity = UserActivity::where('user_id', $userId)->firstOrFail();
-            $userActivity->pool_income;
+            $userActivity->pool_income += $currentIncome;
+            $userActivity->self_earning += $currentIncome;
+            $userActivity->total_earning += $currentIncome;
+            $userActivity->self_earning += $currentIncome;
+            $userActivity->total_earning += $currentIncome;
+            $userActivity->team_earning += $teamIncome;
+            $userActivity->total_earning += $teamIncome;
+            $userActivity->team_earning += $teamIncome;
             $userActivity->update();
+            $teamIncome += $currentIncome;
         }
 
         // Optional: Debug or log the result

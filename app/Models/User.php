@@ -51,10 +51,11 @@ class User extends Authenticatable implements JWTSubject
         'upi',
         'parent_id',
         'manager_id',
-        'product_id',
-        'purchase_date',
-        'product_amount',
-        'product_no',
+        'activation_date',
+        // 'product_id',
+        // 'purchase_date',
+        // 'product_amount',
+        // 'product_no',
 
     ];
 
@@ -86,6 +87,10 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->belongsTo(Document::class, 'profile_document_id');
     }
+    public function sales()
+    {
+        return $this->hasMany(Sale::class);
+    }
 
     public function designation()
     {
@@ -96,6 +101,7 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->hasMany(Earning::class);
     }
+
 
     public function product()
     {

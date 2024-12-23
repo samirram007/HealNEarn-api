@@ -12,8 +12,12 @@ class JoiningBenefit extends Model
     protected $fillable = [
         'user_id',
         'parent_id',
+        'sale_id',
         'level',
         'amount',
         'commission',
     ];
+    public function user(){return $this->belongsTo(User::class);}
+    public function parent(){return $this->belongsTo(User::class);}
+    public function sale(){return $this->belongsTo(Sale::class);}
 }

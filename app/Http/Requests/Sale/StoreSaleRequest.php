@@ -1,12 +1,10 @@
 <?php
 
-namespace App\Http\Requests\User;
+namespace App\Http\Requests\Sale;
 
-use App\Enums\UserStatusEnum;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Enum;
 
-class StatusChangeRequest extends FormRequest
+class StoreSaleRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -24,18 +22,25 @@ class StatusChangeRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'sale_no' => 'nullable|string',
+            'sale_date' => 'required|date',
+            'user_id' =>  'sometimes|required|exists:users,id',
+            'product_id' =>  'required|exists:products,id',
+            'quantity' => 'required',
+            'rate' => 'required',
+            'amount' => 'required',
 
-            'status' => ['required', new Enum(UserStatusEnum::class)],
-            'user_id' => ['required', 'exists:users,id'],
-            'activation_date' => ['nullable', 'date'],
         ];
     }
+
 
     protected function prepareForValidation()
     {
         $fieldsToNormalize = [
+            'saleNo' => 'sale_no',
+            'saleDate' => 'sale_date',
             'userId' => 'user_id',
-            'activationDate' => 'activation_date',
+            'productId' => 'product_id',
         ];
 
         $normalizedData = [];

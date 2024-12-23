@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Resources\Product;
+namespace App\Http\Resources\Payment;
 
 use App\Http\Resources\SuccessResource;
 use Illuminate\Http\Request;
 
 
-class ProductResource extends SuccessResource
+class PaymentResource extends SuccessResource
 {
     /**
      * Transform the resource collection into an array.
@@ -18,8 +18,8 @@ class ProductResource extends SuccessResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'price' => $this->price,
-            'description' => $this->description,
+            'created_at' => $this->created_at?$this->created_at->format('Y-m-d H:i:s'):null,
+            'updated_at' => $this->updated_at?$this->updated_at->format('Y-m-d H:i:s'):null,
         ];
     }
 }

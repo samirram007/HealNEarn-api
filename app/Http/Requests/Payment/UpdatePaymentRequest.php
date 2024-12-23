@@ -1,12 +1,10 @@
 <?php
 
-namespace App\Http\Requests\User;
+namespace App\Http\Requests\Payment;
 
-use App\Enums\UserStatusEnum;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Enum;
 
-class StatusChangeRequest extends FormRequest
+class UpdatePaymentRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -23,19 +21,23 @@ class StatusChangeRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
 
-            'status' => ['required', new Enum(UserStatusEnum::class)],
-            'user_id' => ['required', 'exists:users,id'],
-            'activation_date' => ['nullable', 'date'],
+            return [
+                'payment_date' => 'required|date',
+                'user_id' =>  'required|exists:users,id',
+                'payment_method' => ['required', 'string', 'max:255' ],
+                'amount' => 'required',
+                'manager_id' => 'required|exists:users,id',
         ];
     }
 
     protected function prepareForValidation()
     {
         $fieldsToNormalize = [
+            'paymentDate' => 'payment_date',
             'userId' => 'user_id',
-            'activationDate' => 'activation_date',
+            'paymentMethod' => 'payment_method',
+            'managerId' => 'manager_id',
         ];
 
         $normalizedData = [];

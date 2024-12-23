@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('joining_benefits', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('user_id');
+            $table->unsignedBigInteger('sale_id');
             $table->integer('level')->default(1);
             $table->unsignedBigInteger('parent_id');
             $table->integer('amount')->default(300);
