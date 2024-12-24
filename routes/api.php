@@ -53,6 +53,7 @@ Route::group(['middleware' => 'auth:api'], function () {
     Route::apiResource('members', MemberController::class);
 
     Route::get('member_children/{id}', [MemberController::class,'member_children']);
+    Route::get('member_sale/{id}', [MemberController::class,'member_sale']);
 
     Route::get('member_earning/{id}', [MemberController::class, 'member_earning']);
 

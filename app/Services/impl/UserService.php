@@ -21,6 +21,7 @@ use App\Models\UserActivity;
 use App\Services\IUserService;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Database\RecordsNotFoundException;
 use Illuminate\Support\Facades\DB;
 
 class UserService implements IUserService
@@ -131,20 +132,31 @@ class UserService implements IUserService
         // JoiningBenefit::truncate();
 
         // call for testing only
-        $this->poolIncome();
+        // $this->poolIncome();
         DB::beginTransaction();
 
         try {
             $data = $statusChangeRequest->validated();
 
             $user = User::find($data['user_id']);
+
             if (!$user) {
                 return response()->json([
                     'status' => false,
                     'message' => 'User not found',
                 ], 404);
             }
-            if ($user->status !== 'active') {
+
+
+            $sales = Sale::where('user_id', $user->id);
+            if (!$sales->first()) {
+                DB::rollBack();
+
+                // Return an error response
+                throw new RecordsNotFoundException("you need to place your first order");
+
+            }
+            if ($user->status !== UserStatusEnum::ACTIVE) {
                 // Update user status and other fields
                 $user->status = $data['status'];
                 // $user->product_id = $data['product_id'] ?? 1;
@@ -161,18 +173,18 @@ class UserService implements IUserService
 
             if ($user->status === UserStatusEnum::ACTIVE) {
                 // dd($user->status);
-                $firstSale = Sale::where('user_id', $user->id)
-                    ->where('is_confirm', false)
+
+                $firstSale = $sales->where('is_confirm', false)
                     ->first();
-                    if ($firstSale) {
-                        $firstSale->confirmation_date = $activationDate->toDateTimeString();
-                        $firstSale->confirmed_by_id = auth()->user()->id;
-                        $firstSale->is_confirm = true;
-                        $firstSale->update();
+                if ($firstSale) {
+                    $firstSale->confirmation_date = $activationDate->toDateTimeString();
+                    $firstSale->confirmed_by_id = auth()->user()->id;
+                    $firstSale->is_confirm = true;
+                    $firstSale->update();
 
 
-                    }
-                   // dd($firstSale);
+                }
+                // dd($firstSale);
 
             }
             // Save the changes
@@ -239,14 +251,14 @@ class UserService implements IUserService
                     ->from('joining_benefits');
             })
             ->get();
-       // dd($sales);
+        // dd($sales);
         foreach ($sales as $key => $sale) {
             //$amount = $sale->amount;
             $currentParent = $user->parent; // Start with the immediate parent
             $level = 1;
             $teamEarning = 0;
             while ($currentParent) {
-               // dump($currentParent->id);
+                // dump($currentParent->id);
                 // Calculate commission
                 $commission = 0; // Assuming `joining_amount` is on the user model
                 //dump($currentParent->user_type);
@@ -282,15 +294,14 @@ class UserService implements IUserService
                 }
 
                 // dd($currentParent->user_activity);
-                 if(!$currentParent->user_activity){
-                    $userActivity = UserActivity::create(["user_id"=>$currentParent->id]);
-                 }
-                 else{
+                if (!$currentParent->user_activity) {
+                    $userActivity = UserActivity::create(["user_id" => $currentParent->id]);
+                } else {
 
-                     $userActivity = $currentParent->user_activity;
-                 }
+                    $userActivity = $currentParent->user_activity;
+                }
                 // dump($userActivity );
-                 $userActivity->user_id = $currentParent->id;
+                $userActivity->user_id = $currentParent->id;
 
                 if ($level == 1) {
                     $userActivity->immediate_count += 1;
@@ -338,14 +349,14 @@ class UserService implements IUserService
             7 => ["level" => 7, "min" => 2187, "income" => 2500],
         ];
         // Get the list of selected parent IDs
-        // $parentList = $this->getSelectedParentList();
+        $parentList = $this->getSelectedParentList();
 
         // call for testing only
-        $parentList = User::where('user_type',UserTypeEnum::MEMBER)->get();
+        // $parentList = User::where('user_type',UserTypeEnum::MEMBER)->get();
 
         // dd($userIds);
         $teamIncome = 0;
-        foreach ($parentList as $key=>$user) {
+        foreach ($parentList as $key => $user) {
             $userId = $user['id'];
             $level = 1;
 
@@ -353,22 +364,30 @@ class UserService implements IUserService
             $currentPoolIncomeRates = [];
             // Fetch active child counts grouped by level for the user
             $userActiveChildCount = JoiningBenefit::where('parent_id', '=', $userId)
-                ->selectRaw('level, COUNT(*) as count')
-                // ->groupBy('user_id')
+                ->selectRaw('level, COUNT(DISTINCT user_id) as count ')
                 ->groupBy('level')
                 ->pluck('count', 'level');
-            dd($userActiveChildCount);
+            // if($user->id===9){
+
+            //     dd($userActiveChildCount);
+            // }
 
             // Check each level against pool income criteria
             foreach ($poolIncomeRates as $rate) {
+                // if($userId==9){
+
+                //    dump($userActiveChildCount[$rate['level']], $rate['min']);
+                // }
+
                 if (
                     isset($userActiveChildCount[$rate['level']]) &&
                     $userActiveChildCount[$rate['level']] >= $rate['min']
                 ) {
                     $currentPoolIncomeRates[] = $rate;
-
                     // Save the pool income in the database
                     $poolIncome = PoolIncome::where('user_id', $userId)->where('level', $level)->first();
+                    //  dd($poolIncome);
+
                     if (!$poolIncome) {
                         $currentIncome += $rate['income'];
                         PoolIncome::create([
@@ -385,16 +404,12 @@ class UserService implements IUserService
 
             // Optionally, log or process the user's total pool income
             // e.g., update user's total income, etc.
-            $currentIncome = array_sum(array_column($currentPoolIncomeRates, 'income'));
+            // $currentIncome = array_sum(array_column($currentPoolIncomeRates, 'income'));
             // $totalIncome = array_sum(array_column($currentPoolIncomeRates, 'income'));
             $userActivity = UserActivity::where('user_id', $userId)->firstOrFail();
             $userActivity->pool_income += $currentIncome;
             $userActivity->self_earning += $currentIncome;
             $userActivity->total_earning += $currentIncome;
-            $userActivity->self_earning += $currentIncome;
-            $userActivity->total_earning += $currentIncome;
-            $userActivity->team_earning += $teamIncome;
-            $userActivity->total_earning += $teamIncome;
             $userActivity->team_earning += $teamIncome;
             $userActivity->update();
             $teamIncome += $currentIncome;

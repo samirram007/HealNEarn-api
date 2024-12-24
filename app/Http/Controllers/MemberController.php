@@ -75,6 +75,12 @@ class MemberController extends Controller
 
         return $response;
     }
+    public function member_sale($id)
+    {
+        $response = $this->memberService->getMemberSale($id);
+
+        return $response;
+    }
     public function member_earning($id)
     {
         $response = $this->memberService->getMemberEarning($id);

@@ -11,6 +11,7 @@ interface IMemberService
 
     public function getById($id);
     public function getMemberChildren($id);
+    public function getMemberSale($id);
     public function getMemberEarning($id);
     public function getMemberPayment($id);
 

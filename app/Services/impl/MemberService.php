@@ -128,6 +128,24 @@ class MemberService implements IMemberService
             ], 404);
         }
     }
+    public function getMemberSale($id)
+    {
+        try {
+            $response = Member::with('user_activity','sales.product')->findOrFail($id);
+
+            return MemberResource::make($response);
+        } catch (Exception $e) {
+            // Handle the case where the model is not found
+            // throw new ExceptionsModelNotFoundException($e);
+            // return new ExceptionsModelNotFoundException($e);
+            //dd($e);
+            return response()->json([
+                'status' => false,
+                'message' => 'Record not found.',
+                'code' => 404,
+            ], 404);
+        }
+    }
     public function getMemberEarning($id)
     {
         try {
